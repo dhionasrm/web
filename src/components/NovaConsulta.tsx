@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTrigger,
@@ -19,53 +19,95 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/use-toast";
-
-export type NewAppointment = {
-  patient: string;
-  date: string;
-  time: string;
-  doctor: string;
-  type: string;
-  status: string;
-};
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { appointmentService } from "@/services/appointmentService";
+import { patientService } from "@/services/patientService";
+import { dentistService } from "@/services/dentistService";
+import { AppointmentCreate } from "@/types/api";
 
 type Props = {
   children?: React.ReactNode;
-  onCreate?: (data: NewAppointment) => void;
+  onSuccess?: () => void;
 };
 
-const NovaConsulta: React.FC<Props> = ({ children, onCreate }) => {
+const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
-  const [patient, setPatient] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [doctor, setDoctor] = useState("Dr. Paulo");
-  const [type, setType] = useState("Consulta");
-  const [status, setStatus] = useState("Pendente");
+  const [isLoading, setIsLoading] = useState(false);
+  const [patients, setPatients] = useState<Array<{ id: string; name: string }>>([]);
+  const [dentists, setDentists] = useState<Array<{ id: string; name: string }>>([]);
+  
+  const [formData, setFormData] = useState({
+    patient_id: "",
+    dentist_id: "",
+    appointment_date: "",
+    duration_minutes: 60,
+    treatment_type: "",
+    notes: "",
+  });
 
-  function reset() {
-    setPatient("");
-    setDate("");
-    setTime("");
-    setDoctor("Dr. Paulo");
-    setType("Consulta");
-    setStatus("Pendente");
+  useEffect(() => {
+    if (open) {
+      loadPatients();
+      loadDentists();
+    }
+  }, [open]);
+
+  async function loadPatients() {
+    try {
+      const response = await patientService.list({ limit: 100 });
+      setPatients(response.items.map(p => ({ id: p.id, name: p.name })));
+    } catch (error) {
+      console.error("Erro ao carregar pacientes:", error);
+    }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function loadDentists() {
+    try {
+      const response = await dentistService.list({ limit: 100 });
+      setDentists(response.items.map(d => ({ id: d.id, name: d.name })));
+    } catch (error) {
+      console.error("Erro ao carregar dentistas:", error);
+    }
+  }
+
+  function reset() {
+    setFormData({
+      patient_id: "",
+      dentist_id: "",
+      appointment_date: "",
+      duration_minutes: 60,
+      treatment_type: "",
+      notes: "",
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!patient || !date || !time) {
-      toast({ title: "Preencha os campos obrigatórios", description: "Paciente, data e horário são obrigatórios." });
+    if (!formData.patient_id || !formData.dentist_id || !formData.appointment_date) {
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
-    const data: NewAppointment = { patient, date, time, doctor, type, status };
-    onCreate?.(data);
-    toast({ title: "Consulta criada", description: `${patient} — ${date} ${time}` });
-    setOpen(false);
-    reset();
+    setIsLoading(true);
+    try {
+      const data: AppointmentCreate = {
+        ...formData,
+        appointment_date: new Date(formData.appointment_date).toISOString(),
+      };
+      
+      await appointmentService.create(data);
+      toast.success("Consulta agendada com sucesso!");
+      setOpen(false);
+      reset();
+      onSuccess?.();
+    } catch (error: any) {
+      console.error("Erro ao criar consulta:", error);
+      toast.error(error.response?.data?.detail || "Erro ao agendar consulta");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -80,69 +122,98 @@ const NovaConsulta: React.FC<Props> = ({ children, onCreate }) => {
 
         <form onSubmit={handleSubmit} className="grid gap-4 mt-2">
           <div>
-            <Label htmlFor="patient">Paciente</Label>
-            <Input id="patient" value={patient} onChange={(e) => setPatient(e.target.value)} placeholder="Nome do paciente" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="date">Data</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="time">Horário</Label>
-              <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label>Profissional</Label>
-              <Select value={doctor} onValueChange={(val) => setDoctor(val)}>
-                <SelectTrigger>
-                  <SelectValue>{doctor}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Dr. Paulo">Dr. Paulo</SelectItem>
-                  <SelectItem value="Dra. Ana">Dra. Ana</SelectItem>
-                  <SelectItem value="Dra. Maria">Dra. Maria</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Tipo</Label>
-              <Select value={type} onValueChange={(val) => setType(val)}>
-                <SelectTrigger>
-                  <SelectValue>{type}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Consulta">Consulta</SelectItem>
-                  <SelectItem value="Retorno">Retorno</SelectItem>
-                  <SelectItem value="Exame">Exame</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label>Status</Label>
-            <Select value={status} onValueChange={(val) => setStatus(val)}>
+            <Label htmlFor="patient_id">Paciente *</Label>
+            <Select 
+              value={formData.patient_id} 
+              onValueChange={(val) => setFormData({ ...formData, patient_id: val })}
+            >
               <SelectTrigger>
-                <SelectValue>{status}</SelectValue>
+                <SelectValue placeholder="Selecione o paciente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Confirmada">Confirmada</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
+                {patients.map((patient) => (
+                  <SelectItem key={patient.id} value={patient.id}>
+                    {patient.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
+          <div>
+            <Label htmlFor="dentist_id">Dentista *</Label>
+            <Select 
+              value={formData.dentist_id} 
+              onValueChange={(val) => setFormData({ ...formData, dentist_id: val })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o dentista" />
+              </SelectTrigger>
+              <SelectContent>
+                {dentists.map((dentist) => (
+                  <SelectItem key={dentist.id} value={dentist.id}>
+                    {dentist.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="appointment_date">Data e Horário *</Label>
+            <Input 
+              id="appointment_date" 
+              type="datetime-local" 
+              value={formData.appointment_date} 
+              onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })} 
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="duration_minutes">Duração (minutos)</Label>
+              <Input 
+                id="duration_minutes" 
+                type="number"
+                min="15"
+                step="15"
+                value={formData.duration_minutes} 
+                onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })} 
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="treatment_type">Tipo de Tratamento</Label>
+              <Input
+                id="treatment_type"
+                value={formData.treatment_type}
+                onChange={(e) => setFormData({ ...formData, treatment_type: e.target.value })}
+                placeholder="Ex: Limpeza, Consulta, Extração"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="notes">Observações</Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Observações adicionais..."
+              rows={3}
+            />
+          </div>
+
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="ghost">Cancelar</Button>
+              <Button type="button" variant="ghost" disabled={isLoading}>
+                Cancelar
+              </Button>
             </DialogClose>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Salvando..." : "Agendar"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

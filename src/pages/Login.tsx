@@ -19,16 +19,20 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate loading
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (login(username, password)) {
-      toast.success('Login realizado com sucesso!');
-      navigate('/dashboard');
-    } else {
-      toast.error('Usuário ou senha incorretos');
+    try {
+      const success = await login(username, password);  // username será o email
+      if (success) {
+        toast.success('Login realizado com sucesso!');
+        navigate('/dashboard');
+      } else {
+        toast.error('Usuário ou senha incorretos');
+      }
+    } catch (error) {
+      toast.error('Erro ao fazer login. Tente novamente.');
+      console.error('Login error:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
@@ -49,13 +53,13 @@ const Login = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuário</Label>
+              <Label htmlFor="username">Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="username"
-                  type="text"
-                  placeholder="Digite seu usuário"
+                  type="email"
+                  placeholder="Digite seu email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-10"
@@ -87,7 +91,7 @@ const Login = () => {
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
-            Use: admin / admin
+            Entre com suas credenciais
           </p>
         </CardContent>
       </Card>

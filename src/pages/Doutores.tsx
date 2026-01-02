@@ -1,28 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import NovoDentista from '@/components/NovoDentista';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Phone, Mail } from 'lucide-react';
-
-const doctors = [
-  { id: 1, name: 'Maria Silva', email: 'maria@email.com', phone: '(11) 99999-1111', cro: '39404', lastVisit: '10/12/2025' },
-  { id: 2, name: 'João Santos', email: 'joao@email.com', phone: '(11) 99999-2222', cro: '45012', lastVisit: '08/12/2025' },
-  { id: 3, name: 'Ana Costa', email: 'ana@email.com', phone: '(11) 99999-3333', cro: '32109', lastVisit: '05/12/2025' },
-  { id: 4, name: 'Carlos Lima', email: 'carlos@email.com', phone: '(11) 99999-4444', cro: '98765', lastVisit: '01/12/2025' },
-  { id: 5, name: 'Beatriz Souza', email: 'beatriz@email.com', phone: '(11) 99999-5555', cro: '13579', lastVisit: '28/11/2025' },
-  { id: 6, name: 'Ricardo Alves', email: 'ricardo@email.com', phone: '(11) 99999-6666', cro: '24680', lastVisit: '25/11/2025' },
-];
+import { Plus, Search, Phone, Mail, Loader2 } from 'lucide-react';
+import { dentistService } from '@/services/dentistService';
+import { Dentist } from '@/types/api';
+import { toast } from 'sonner';
 
 const Doutores = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [dentists, setDentists] = useState<Dentist[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredDoctors = doctors.filter(
-    (doctor) =>
-      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (doctor.cro && doctor.cro.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const loadDentists = async () => {
+    setIsLoading(true);
+    try {
+      const response = await dentistService.list({ 
+        limit: 100,
+        search: searchTerm || undefined 
+      });
+      // A API pode retornar array direto ou objeto com items
+      const dentistsList = Array.isArray(response) ? response : (response.items || []);
+      setDentists(dentistsList);
+    } catch (error: any) {
+      console.error('Erro ao carregar dentistas:', error);
+      toast.error('Erro ao carregar dentistas');
+      setDentists([]); // Garantir array vazio em caso de erro
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDentists();
+  }, []);
+
+  const filteredDoctors = searchTerm && Array.isArray(dentists)
+    ? dentists.filter(
+        (dentist) =>
+          dentist.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (dentist.email && dentist.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          dentist.cro.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : (Array.isArray(dentists) ? dentists : []);
 
   return (
     <DashboardLayout>
@@ -32,10 +54,12 @@ const Doutores = () => {
             <h1 className="text-2xl font-bold text-foreground">Dentistas</h1>
             <p className="text-muted-foreground">Cadastro e gerenciamento de Dentistas.</p>
           </div>
-          <Button className="gradient-primary gap-2">
-            <Plus className="w-4 h-4" />
-            Novo Dentista
-          </Button>
+          <NovoDentista onSuccess={loadDentists}>
+            <Button className="gradient-primary gap-2">
+              <Plus className="w-4 h-4" />
+              Novo Dentista
+            </Button>
+          </NovoDentista>
         </div>
 
         <div className="relative max-w-md">
@@ -48,8 +72,17 @@ const Doutores = () => {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredDoctors.map((doctor, index) => (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : filteredDoctors.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nenhum dentista encontrado</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredDoctors.map((doctor, index) => (
             <Card 
               key={doctor.id} 
               className="shadow-card hover:shadow-elevated transition-all cursor-pointer"
@@ -59,11 +92,11 @@ const Doutores = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-lg font-semibold text-primary">
-                      {doctor.name.charAt(0)}
+                      {doctor.nome.charAt(0)}
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground">{doctor.name}</h3>
+                    <h3 className="font-semibold text-foreground">{doctor.nome}</h3>
                     <p className="text-sm text-muted-foreground">
                       CRO: {doctor.cro}
                     </p>
@@ -71,23 +104,28 @@ const Doutores = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Mail className="w-4 h-4" />
-                  <span>{doctor.email}</span>
-                </div>
+                {doctor.email && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="w-4 h-4" />
+                    <span>{doctor.email}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="w-4 h-4" />
-                  <span>{doctor.phone}</span>
+                  <span>{doctor.telefone}</span>
                 </div>
-                <div className="pt-2 border-t mt-3">
-                  <p className="text-xs text-muted-foreground">
-                    Último atendimento: <span className="font-medium">{doctor.lastVisit}</span>
-                  </p>
-                </div>
+                {doctor.especialidade && (
+                  <div className="pt-2 border-t mt-3">
+                    <p className="text-xs text-muted-foreground">
+                      Especialidade: <span className="font-medium">{doctor.especialidade}</span>
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
+        )}
       </div>
     </DashboardLayout>
   );

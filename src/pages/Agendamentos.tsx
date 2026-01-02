@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import NovaConsulta from '@/components/NovaConsulta';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,29 +13,64 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-const initialAppointments = [
-  { id: 1, patient: 'Maria Silva', date: '15/12/2025', time: '09:00', doctor: 'Dr. Paulo', type: 'Consulta', status: 'Confirmada' },
-  { id: 2, patient: 'João Santos', date: '15/12/2025', time: '10:30', doctor: 'Dra. Ana', type: 'Retorno', status: 'Confirmada' },
-  { id: 3, patient: 'Ana Costa', date: '15/12/2025', time: '11:00', doctor: 'Dr. Paulo', type: 'Consulta', status: 'Pendente' },
-  { id: 4, patient: 'Carlos Lima', date: '16/12/2025', time: '14:00', doctor: 'Dra. Maria', type: 'Exame', status: 'Confirmada' },
-  { id: 5, patient: 'Beatriz Souza', date: '16/12/2025', time: '15:30', doctor: 'Dr. Paulo', type: 'Consulta', status: 'Pendente' },
-  { id: 6, patient: 'Ricardo Alves', date: '17/12/2025', time: '08:30', doctor: 'Dra. Ana', type: 'Retorno', status: 'Confirmada' },
-];
+import { appointmentService } from '@/services/appointmentService';
+import { Appointment } from '@/types/api';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 const Agendamentos = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [appointments, setAppointments] = useState(initialAppointments);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  function handleCreate(newApt: any) {
-    setAppointments((prev) => [{ id: prev.length + 1, ...newApt }, ...prev]);
-  }
+  const loadAppointments = async () => {
+    setIsLoading(true);
+    try {
+      const response = await appointmentService.list({ limit: 100 });
+      setAppointments(response.items);
+    } catch (error: any) {
+      console.error('Erro ao carregar consultas:', error);
+      toast.error('Erro ao carregar consultas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const filteredAppointments = appointments.filter(
-    (apt) =>
-      apt.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      apt.doctor.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    loadAppointments();
+  }, []);
+
+  const filteredAppointments = searchTerm
+    ? appointments.filter(
+        (apt) =>
+          apt.patient?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          apt.dentist?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : appointments;
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      scheduled: 'bg-blue-500/10 text-blue-500',
+      confirmed: 'bg-success/10 text-success',
+      in_progress: 'bg-purple-500/10 text-purple-500',
+      completed: 'bg-success/10 text-success',
+      cancelled: 'bg-destructive/10 text-destructive',
+      no_show: 'bg-warning/10 text-warning',
+    };
+    return colors[status] || 'bg-muted/10 text-muted-foreground';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      scheduled: 'Agendada',
+      confirmed: 'Confirmada',
+      in_progress: 'Em Andamento',
+      completed: 'Concluída',
+      cancelled: 'Cancelada',
+      no_show: 'Não Compareceu',
+    };
+    return labels[status] || status;
+  };
 
   return (
     <DashboardLayout>
@@ -45,7 +80,7 @@ const Agendamentos = () => {
             <h1 className="text-2xl font-bold text-foreground">Agendamentos</h1>
             <p className="text-muted-foreground">Gerencie todas as consultas agendadas</p>
           </div>
-          <NovaConsulta onCreate={handleCreate}>
+          <NovaConsulta onSuccess={loadAppointments}>
             <Button className="gradient-primary gap-2">
               <Plus className="w-4 h-4" />
               Nova Consulta
@@ -68,48 +103,52 @@ const Agendamentos = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Paciente</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Horário</TableHead>
-                    <TableHead>Médico</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAppointments.map((appointment) => (
-                    <TableRow key={appointment.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{appointment.patient}</TableCell>
-                      <TableCell>{appointment.date}</TableCell>
-                      <TableCell>{appointment.time}</TableCell>
-                      <TableCell>{appointment.doctor}</TableCell>
-                      <TableCell>{appointment.type}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            appointment.status === 'Confirmada'
-                              ? 'bg-success/10 text-success'
-                              : 'bg-warning/10 text-warning'
-                          }`}
-                        >
-                          {appointment.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Nenhuma consulta encontrada</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Paciente</TableHead>
+                      <TableHead>Dentista</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Horário</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAppointments.map((appointment) => (
+                      <TableRow key={appointment.id} className="hover:bg-muted/30">
+                        <TableCell className="font-medium">{appointment.patient?.name || 'N/A'}</TableCell>
+                        <TableCell>{appointment.dentist?.name || 'N/A'}</TableCell>
+                        <TableCell>{format(new Date(appointment.appointment_date), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell>{format(new Date(appointment.appointment_date), 'HH:mm')}</TableCell>
+                        <TableCell>{appointment.treatment_type || '-'}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                            {getStatusLabel(appointment.status)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
