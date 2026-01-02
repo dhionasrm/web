@@ -41,7 +41,7 @@ export const appointmentService = {
     return response.data;
   },
 
-  async cancel(id: string): Promise<void> {
-    await api.delete(`/api/appointments/${id}`);
+  async cancel(id: string, reason?: string): Promise<void> {
+    await api.delete(`/api/appointments/${id}`, { data: { reason } });
   },
 };

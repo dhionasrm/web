@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatPhone } from '@/lib/utils';
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { isEmailValid } from '@/lib/utils';
 import { LifeBuoy, Phone, MessageSquare } from "lucide-react";
 
 type Ticket = {
@@ -110,7 +112,10 @@ const Suporte: React.FC = () => {
                 </div>
 
                 <Input placeholder="E-mail para contato (opcional)" value={email} onChange={(e) => setEmail(e.target.value)} />
-                <Input placeholder="Telefone para contato (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                {email && !isEmailValid(email) && (
+                  <p className="text-xs text-amber-600 mt-1">Informe um endereço de email válido (ex.: usuário@dominio).</p>
+                )}
+                  <Input placeholder="Telefone para contato (opcional)" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} />
               </div>
 
               <div className="flex gap-2 justify-end">

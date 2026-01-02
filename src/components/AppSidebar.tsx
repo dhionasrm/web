@@ -22,7 +22,6 @@ const menuItems = [
   { title: 'Dentistas', url: '/doutores', icon: Users },
   { title: 'Pacientes', url: '/pacientes', icon: Users },
   { title: 'Suporte', url: '/suporte', icon: LifeBuoy },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -37,14 +36,8 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center shadow-soft">
-            <Calendar className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h2 className="font-bold text-foreground">MedAgenda</h2>
-            <p className="text-xs text-muted-foreground">Sistema de Consultas</p>
-          </div>
+        <div className="flex items-center justify-center">
+          <img src="/logo_login.png" alt="MedAgenda" className="w-full h-auto max-w-[200px] object-contain" />
         </div>
       </SidebarHeader>
 
@@ -75,14 +68,25 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-medium text-primary">
-              {user?.username?.charAt(0).toUpperCase()}
+              {user?.nome?.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{user?.username}</p>
-            <p className="text-xs text-muted-foreground">Administrador</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.nome}</p>
+            <p className="text-xs text-muted-foreground">{user?.perfil ?? 'Administrador'}</p>
           </div>
         </div>
+        <div className="mb-3">
+          <NavLink
+            to="/configuracoes"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Configurações</span>
+          </NavLink>
+        </div>
+
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"

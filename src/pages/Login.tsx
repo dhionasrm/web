@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { isEmailValid } from '@/lib/utils';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -45,10 +46,8 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-elevated animate-fade-in relative">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto flex items-center justify-center mb-4">
-            <img src="/favicon.ico" alt="Logo" className="w-[200px] h-[200px] object-contain" />
+            <img src="/logo_login.png" alt="Logo" className="w-[400px] h-[300px] object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">AGENDA MAIS</CardTitle>
-          <CardDescription>Sistema de Agendamento de Consultas</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -82,6 +81,9 @@ const Login = () => {
                 />
               </div>
             </div>
+            {username && !isEmailValid(username) && (
+              <p className="text-xs text-amber-600 mt-2">Informe um endereço de email válido (ex.: usuário@dominio).</p>
+            )}
             <Button
               type="submit"
               className="w-full gradient-primary hover:opacity-90 transition-opacity"
@@ -91,7 +93,7 @@ const Login = () => {
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
-            Entre com suas credenciais
+            Esqueceu sua senha? <a href="/reset-password" className="text-primary hover:underline">Redefinir senha</a>
           </p>
         </CardContent>
       </Card>

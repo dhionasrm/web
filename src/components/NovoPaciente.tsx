@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatPhone } from '@/lib/utils';
 import {
   Dialog,
   DialogTrigger,
@@ -13,7 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { usePlans } from '@/hooks/use-plans';
 import { toast } from "sonner";
+import { isEmailValid } from '@/lib/utils';
 import { patientService } from "@/services/patientService";
 import { PatientCreate } from "@/types/api";
 
@@ -28,15 +32,21 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
   const [formData, setFormData] = useState<PatientCreate>({
     nome: "",
     telefone: "",
+    tipoAtendimento: '',
     email: "",
     dataNascimento: "",
     observacoes: "",
   });
 
+  const { plans } = usePlans();
+
+  
+
   function reset() {
     setFormData({
       nome: "",
       telefone: "",
+      tipoAtendimento: '',
       email: "",
       dataNascimento: "",
       observacoes: "",
@@ -53,7 +63,8 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
 
     setIsLoading(true);
     try {
-      await patientService.create(formData);
+      const payload = { ...formData, telefone: formData.telefone.replace(/\D/g, '') };
+      await patientService.create(payload);
       toast.success("Paciente cadastrado com sucesso!");
       setOpen(false);
       reset();
@@ -96,7 +107,10 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
               <Input
                 id="phone"
                 value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                onChange={(e) => {
+                  const formatted = formatPhone(e.target.value);
+                  setFormData({ ...formData, telefone: formatted });
+                }}
                 placeholder="(00) 00000-0000"
                 required
               />
@@ -111,7 +125,28 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="email@exemplo.com"
               />
+              {formData.email && !isEmailValid(formData.email) && (
+                <p className="text-xs text-amber-600 mt-1">Informe um endereço de email válido (ex.: usuário@dominio).</p>
+              )}
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="tipoAtendimento">Tipo de Atendimento</Label>
+            <div className="flex gap-2 items-start">
+              <Select value={formData.tipoAtendimento} onValueChange={(val) => setFormData({ ...formData, tipoAtendimento: val })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            
           </div>
 
           <div>
@@ -152,3 +187,4 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
 };
 
 export default NovoPaciente;
+ 

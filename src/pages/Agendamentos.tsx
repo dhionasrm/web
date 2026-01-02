@@ -4,7 +4,18 @@ import NovaConsulta from '@/components/NovaConsulta';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Loader2, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -22,12 +33,19 @@ const Agendamentos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openDelete, setOpenDelete] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = React.useState<string | null>(null);
+  const [reason, setReason] = React.useState('');
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const loadAppointments = async () => {
     setIsLoading(true);
     try {
       const response = await appointmentService.list({ limit: 100 });
-      setAppointments(response.items);
+      // response can be a paginated object or an array depending on API
+      const items = Array.isArray(response) ? response : (response.items ?? []);
+      setAppointments(items || []);
     } catch (error: any) {
       console.error('Erro ao carregar consultas:', error);
       toast.error('Erro ao carregar consultas');
@@ -40,13 +58,13 @@ const Agendamentos = () => {
     loadAppointments();
   }, []);
 
-  const filteredAppointments = searchTerm
-    ? appointments.filter(
-        (apt) =>
-          apt.patient?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          apt.dentist?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : appointments;
+  const filteredAppointments = (appointments || []).filter((apt) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const patientName = apt.patient?.nome ?? '';
+    const dentistName = apt.dentist?.nome ?? '';
+    return patientName.toLowerCase().includes(term) || dentistName.toLowerCase().includes(term);
+  });
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -128,10 +146,10 @@ const Agendamentos = () => {
                   <TableBody>
                     {filteredAppointments.map((appointment) => (
                       <TableRow key={appointment.id} className="hover:bg-muted/30">
-                        <TableCell className="font-medium">{appointment.patient?.name || 'N/A'}</TableCell>
-                        <TableCell>{appointment.dentist?.name || 'N/A'}</TableCell>
-                        <TableCell>{format(new Date(appointment.appointment_date), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell>{format(new Date(appointment.appointment_date), 'HH:mm')}</TableCell>
+                        <TableCell className="font-medium">{appointment.patient?.nome || 'N/A'}</TableCell>
+                        <TableCell>{appointment.dentist?.nome || 'N/A'}</TableCell>
+                        <TableCell>{appointment.appointment_date ? format(new Date(appointment.appointment_date), 'dd/MM/yyyy') : '-'}</TableCell>
+                        <TableCell>{appointment.appointment_date ? format(new Date(appointment.appointment_date), 'HH:mm') : '-'}</TableCell>
                         <TableCell>{appointment.treatment_type || '-'}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
@@ -139,9 +157,24 @@ const Agendamentos = () => {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setSelectedId(appointment.id);
+                                setSelectedLabel(`${appointment.patient?.nome ?? 'N/A'} - ${appointment.appointment_date ? format(new Date(appointment.appointment_date), 'dd/MM/yyyy HH:mm') : '-'}`);
+                                setReason('');
+                                setOpenDelete(true);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -151,6 +184,47 @@ const Agendamentos = () => {
             )}
           </CardContent>
         </Card>
+        <Dialog open={openDelete} onOpenChange={setOpenDelete}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancelar consulta</DialogTitle>
+              <DialogDescription>
+                Você está cancelando a consulta: <strong>{selectedLabel}</strong>. Informe o motivo do cancelamento.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4">
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo do cancelamento" />
+            </div>
+
+            <DialogFooter>
+              <DialogClose>
+                <Button variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!selectedId) return;
+                  setIsDeleting(true);
+                  try {
+                    await appointmentService.cancel(selectedId, reason || undefined);
+                    toast.success('Consulta cancelada com sucesso');
+                    setOpenDelete(false);
+                    loadAppointments();
+                  } catch (err) {
+                    console.error(err);
+                    toast.error('Erro ao cancelar consulta');
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

@@ -34,6 +34,7 @@ export interface Patient {
   cpf?: string;
   email?: string;
   telefone: string;
+  tipoAtendimento?: string;
   dataNascimento?: string;
   observacoes?: string;
   ativo: boolean;
@@ -43,6 +44,7 @@ export interface Patient {
 
 export interface PatientCreate {
   nome: string;
+  tipoAtendimento?: string;
   email?: string;
   telefone: string;
   dataNascimento?: string;
@@ -51,6 +53,7 @@ export interface PatientCreate {
 
 export interface PatientUpdate {
   nome?: string;
+  tipoAtendimento?: string;
   email?: string;
   telefone?: string;
   dataNascimento?: string;

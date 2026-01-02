@@ -13,6 +13,7 @@ import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
 import Doutores from "./pages/Doutores";
 import Suporte from "./pages/Suporte";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/doutores" element={<Doutores />} />
             <Route path="/calendario" element={<Calendario />} />
             <Route path="/suporte" element={<Suporte />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

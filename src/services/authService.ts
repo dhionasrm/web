@@ -46,4 +46,17 @@ export const authService = {
   isAuthenticated(): boolean {
     return !!this.getStoredToken();
   },
+
+  async forgotPassword(email: string): Promise<void> {
+    // Endpoint de recuperação de senha - ajuste se a API usar outro path
+    await api.post('/api/auth/forgot-password', { email });
+  },
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    // Endpoint para alteração de senha autenticada
+    await api.post('/api/auth/change-password', {
+      old_password: oldPassword,
+      new_password: newPassword,
+    });
+  },
 };

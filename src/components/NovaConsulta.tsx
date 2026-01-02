@@ -56,7 +56,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   async function loadPatients() {
     try {
       const response = await patientService.list({ limit: 100 });
-      setPatients(response.items.map(p => ({ id: p.id, name: p.name })));
+      setPatients(response.items.map(p => ({ id: p.id, name: p.nome })));
     } catch (error) {
       console.error("Erro ao carregar pacientes:", error);
     }
@@ -65,7 +65,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   async function loadDentists() {
     try {
       const response = await dentistService.list({ limit: 100 });
-      setDentists(response.items.map(d => ({ id: d.id, name: d.name })));
+      setDentists(response.items.map(d => ({ id: d.id, name: d.nome })));
     } catch (error) {
       console.error("Erro ao carregar dentistas:", error);
     }

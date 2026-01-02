@@ -1,0 +1,108 @@
+Resumo de alterações front-end — Para o time backend
+Data: 2026-01-02
+
+Objetivo
+- Documentar mudanças recentes no front-end para alinhamento com backend.
+
+Principais pontos a verificar no backend
+- Novos/alterados endpoints usados pelo front-end (ver abaixo).
+- Contratos esperados: formato de payloads (ex.: telefone apenas dígitos, campo tipoAtendimento).
+- Exclusões/cancelamentos: chamadas `DELETE` agora enviam um body com `{ reason }`.
+
+Alterações por área (arquivos alterados)
+
+1) Autenticação
+- src/services/authService.ts
+  - Adicionados métodos usados pelo front:
+    - `forgotPassword(email: string)` -> POST /api/auth/forgot-password
+    - `changePassword(oldPassword, newPassword)` -> POST /api/auth/change-password
+  - Observação: front espera respostas padrão (200/201) e mensagens de erro em `response.data.message`.
+
+- src/pages/ResetPassword.tsx
+  - Nova página de solicitação de recuperação de senha (form com email).
+  - Validação simples de email no cliente (presença de '@').
+  - Chama `authService.forgotPassword(email)`.
+
+2) Senha / Segurança
+- src/pages/Configuracoes.tsx
+  - Modal de alteração de senha (senha antiga, nova senha, confirmação).
+  - Regras exigidas no front: >=8 chars, maiúscula, minúscula, número, caractere especial.
+  - Chamada a `authService.changePassword(oldPassword, newPassword)`.
+
+3) Pacientes / Planos
+- src/types/api.ts
+  - Adicionado `tipoAtendimento?: string` em `Patient`, `PatientCreate`, `PatientUpdate`.
+
+- src/hooks/use-plans.ts
+  - Novo hook que mantém lista de planos em `localStorage` (chave: `plans_list_v1`).
+  - API: `usePlans().plans`, `addPlan(name)`, `removePlan(name)`.
+
+- src/components/NovoPaciente.tsx
+  - Inclui campo `tipoAtendimento` (Select) que consome `usePlans().plans`.
+  - Teléfono: máscara no cliente e antes do envio o front envia `telefone` apenas com dígitos (removendo non-digits).
+  - Observação: gerenciador de planos inline foi removido (agora centralizado em Configurações).
+
+- src/pages/Configuracoes.tsx
+  - Adicionado cartão "Planos" com botão discreto "Gerenciar planos".
+  - `PlanManager` é um modal compacto que usa `usePlans` para adicionar/remover planos.
+  - O front persiste os planos apenas no localStorage; não há (ainda) sincronização automática com backend.
+
+4) Serviços afetados (DELETE com reason)
+- src/services/patientService.ts
+- src/services/dentistService.ts
+- src/services/appointmentService.ts
+  - Para remoção/cancelamento, o front chama `axios.delete(url, { data: { reason } })`.
+  - Favor confirmar que o backend aceita `DELETE` com body JSON `{ reason }` e trate-o adequadamente.
+  - Endpoints esperados (exemplos):
+    - DELETE /api/patients/{id}  body: { reason: string }
+    - DELETE /api/dentists/{id} body: { reason: string }
+    - DELETE /api/appointments/{id} body: { reason: string }
+
+5) Telefones e emails
+- src/lib/utils.ts
+  - Adicionadas utilitárias `formatPhone(value)` e `isEmailValid(value)`.
+  - Front aplica máscara `(##) #####-####` (máx 11 dígitos) e envia apenas dígitos ao backend.
+  - Favor validar no backend que o campo `telefone` pode chegar como 10/11 dígitos sem formatação.
+
+6) Ajustes de campos (nome vs nome)
+- Vários componentes foram corrigidos para usar `nome` (português) em vez de `name` onde a API retorna `nome`.
+  - Arquivos ajustados: `src/pages/Agendamentos.tsx`, `src/components/NovaConsulta.tsx`, entre outros.
+  - Observação: garantir que os objetos retornados pelo backend para pacientes/dentistas usem `nome`.
+
+7) UI / Outros
+- src/components/AppSidebar.tsx
+  - Ajustes estéticos e correção de exibição de `user.nome` e `user.perfil`.
+
+- src/pages/Login.tsx
+  - Pequena validação de email no cliente e integração com `ResetPassword`.
+
+- Observação geral: o front assume que erros do backend retornam mensagens em `response.data.message`.
+
+Recomendações e pendências para o backend
+- Confirmar suporte a DELETE com body JSON `{ reason }` para endpoints de remoção/cancelamento.
+- Confirmar contratos para: `PatientCreate` (campo `tipoAtendimento` opcional) e formato de `telefone` (sem formatação).
+- Avaliar se a lista de planos deve ser persistida no backend (atualmente está apenas em localStorage). Se sim, podemos
+  coordenar um endpoint CRUD para planos e atualizar `use-plans` para sincronizar.
+- Conferir endpoints de autenticação:
+  - POST /api/auth/forgot-password (payload: { email }) — front envia apenas email.
+  - POST /api/auth/change-password (payload: { oldPassword, newPassword }) — front envia essas chaves.
+
+Notas técnicas rápidas
+- LocalStorage key para planos: `plans_list_v1`.
+- Arquivos criados/alterados principais:
+  - src/pages/ResetPassword.tsx (novo)
+  - src/services/authService.ts (forgot/change)
+  - src/pages/Configuracoes.tsx (modal change-password + PlanManager)
+  - src/hooks/use-plans.ts (novo)
+  - src/components/NovoPaciente.tsx (campo tipoAtendimento, máscara telefone)
+  - src/lib/utils.ts (formatPhone, isEmailValid)
+  - src/services/{patient,dentist,appointment}Service.ts (DELETE body reason)
+  - src/types/api.ts (adicionou tipoAtendimento)
+
+Se precisarem, posso:
+- Gerar um pequeno diff resumido por endpoint (ex.: exemplos de requests/JSON esperados).
+- Implementar endpoints CRUD para `planos` no backend e sincronizar o front.
+
+---
+Arquivo gerado pelo time front-end para facilitar a integração.
+Se quiserem, eu gero também exemplos cURL/HTTP para cada nova chamada.

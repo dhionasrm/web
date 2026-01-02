@@ -4,7 +4,18 @@ import NovoPaciente from '@/components/NovoPaciente';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Phone, Mail, CreditCard, Loader2 } from 'lucide-react';
+import { Plus, Search, Phone, Mail, CreditCard, Loader2, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { patientService } from '@/services/patientService';
 import { Patient } from '@/types/api';
 import { toast } from 'sonner';
@@ -14,6 +25,11 @@ const Pacientes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openDelete, setOpenDelete] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedName, setSelectedName] = React.useState<string | null>(null);
+  const [reason, setReason] = React.useState('');
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const loadPatients = async () => {
     setIsLoading(true);
@@ -130,11 +146,65 @@ const Pacientes = () => {
                     </p>
                   </div>
                 )}
+                <div className="pt-3 border-t mt-3 flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setSelectedId(patient.id);
+                      setSelectedName(patient.nome);
+                      setReason('');
+                      setOpenDelete(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />Remover
+                  </Button>
+                </div>
               </CardContent>
             </Card>
             ))}
           </div>
         )}
+      <Dialog open={openDelete} onOpenChange={setOpenDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover paciente</DialogTitle>
+            <DialogDescription>
+              Você está removendo <strong>{selectedName}</strong>. Informe o motivo da remoção.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4">
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo da remoção" />
+          </div>
+
+          <DialogFooter>
+            <DialogClose>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!selectedId) return;
+                setIsDeleting(true);
+                try {
+                  await patientService.delete(selectedId, reason || undefined);
+                  toast.success('Paciente removido com sucesso');
+                  setOpenDelete(false);
+                  loadPatients();
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Erro ao remover paciente');
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Removendo...' : 'Confirmar remoção'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </DashboardLayout>
   );

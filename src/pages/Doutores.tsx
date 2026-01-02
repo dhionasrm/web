@@ -4,7 +4,18 @@ import NovoDentista from '@/components/NovoDentista';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Phone, Mail, Loader2 } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Loader2, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { dentistService } from '@/services/dentistService';
 import { Dentist } from '@/types/api';
 import { toast } from 'sonner';
@@ -13,6 +24,11 @@ const Doutores = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dentists, setDentists] = useState<Dentist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openDelete, setOpenDelete] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedName, setSelectedName] = React.useState<string | null>(null);
+  const [reason, setReason] = React.useState('');
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const loadDentists = async () => {
     setIsLoading(true);
@@ -109,7 +125,48 @@ const Doutores = () => {
                     <Mail className="w-4 h-4" />
                     <span>{doctor.email}</span>
                   </div>
-                )}
+                    )}
+                  <Dialog open={openDelete} onOpenChange={setOpenDelete}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Remover dentista</DialogTitle>
+                        <DialogDescription>
+                          Você está removendo <strong>{selectedName}</strong>. Informe o motivo da remoção.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="mt-4">
+                        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo da remoção" />
+                      </div>
+
+                      <DialogFooter>
+                        <DialogClose>
+                          <Button variant="outline">Cancelar</Button>
+                        </DialogClose>
+                        <Button
+                          variant="destructive"
+                          onClick={async () => {
+                            if (!selectedId) return;
+                            setIsDeleting(true);
+                            try {
+                              await dentistService.delete(selectedId, reason || undefined);
+                              toast.success('Dentista removido com sucesso');
+                              setOpenDelete(false);
+                              loadDentists();
+                            } catch (err) {
+                              console.error(err);
+                              toast.error('Erro ao remover dentista');
+                            } finally {
+                              setIsDeleting(false);
+                            }
+                          }}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? 'Removendo...' : 'Confirmar remoção'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="w-4 h-4" />
                   <span>{doctor.telefone}</span>
@@ -121,6 +178,19 @@ const Doutores = () => {
                     </p>
                   </div>
                 )}
+                <div className="pt-3 border-t mt-3 flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setSelectedId(doctor.id);
+                      setSelectedName(doctor.nome);
+                      setReason('');
+                      setOpenDelete(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />Remover
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
