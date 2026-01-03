@@ -25,13 +25,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { appointmentService } from '@/services/appointmentService';
-import { Appointment } from '@/types/api';
+import { patientService } from '@/services/patientService';
+import { dentistService } from '@/services/dentistService';
+import { Appointment, Patient, Dentist } from '@/types/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 const Agendamentos = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [dentists, setDentists] = useState<Dentist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openDelete, setOpenDelete] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -42,10 +46,20 @@ const Agendamentos = () => {
   const loadAppointments = async () => {
     setIsLoading(true);
     try {
-      const response = await appointmentService.list({ limit: 100 });
-      // response can be a paginated object or an array depending on API
-      const items = Array.isArray(response) ? response : (response.items ?? []);
-      setAppointments(items || []);
+      // Carrega tudo em paralelo
+      const [appointmentsRes, patientsRes, dentistsRes] = await Promise.all([
+        appointmentService.list({ limit: 100 }),
+        patientService.list({ limit: 100 }),
+        dentistService.list({ limit: 100 })
+      ]);
+      
+      const appointmentsList = Array.isArray(appointmentsRes) ? appointmentsRes : (appointmentsRes.items ?? []);
+      const patientsList = Array.isArray(patientsRes) ? patientsRes : (patientsRes.items ?? []);
+      const dentistsList = Array.isArray(dentistsRes) ? dentistsRes : (dentistsRes.items ?? []);
+
+      setAppointments(appointmentsList);
+      setPatients(patientsList);
+      setDentists(dentistsList);
     } catch (error: any) {
       console.error('Erro ao carregar consultas:', error);
       toast.error('Erro ao carregar consultas');
@@ -58,11 +72,23 @@ const Agendamentos = () => {
     loadAppointments();
   }, []);
 
+  // Função para buscar nome do paciente pelo ID
+  const getPatientName = (patientId: number) => {
+    const patient = patients.find(p => String(p.id) === String(patientId));
+    return patient?.nome || 'N/A';
+  };
+
+  // Função para buscar nome do dentista pelo ID
+  const getDentistName = (dentistId: number) => {
+    const dentist = dentists.find(d => String(d.id) === String(dentistId));
+    return dentist?.nome || 'N/A';
+  };
+
   const filteredAppointments = (appointments || []).filter((apt) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    const patientName = apt.patient?.nome ?? '';
-    const dentistName = apt.dentist?.nome ?? '';
+    const patientName = getPatientName(apt.pacienteId);
+    const dentistName = getDentistName(apt.dentistaId);
     return patientName.toLowerCase().includes(term) || dentistName.toLowerCase().includes(term);
   });
 
@@ -144,40 +170,46 @@ const Agendamentos = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAppointments.map((appointment) => (
-                      <TableRow key={appointment.id} className="hover:bg-muted/30">
-                        <TableCell className="font-medium">{appointment.patient?.nome || 'N/A'}</TableCell>
-                        <TableCell>{appointment.dentist?.nome || 'N/A'}</TableCell>
-                        <TableCell>{appointment.appointment_date ? format(new Date(appointment.appointment_date), 'dd/MM/yyyy') : '-'}</TableCell>
-                        <TableCell>{appointment.appointment_date ? format(new Date(appointment.appointment_date), 'HH:mm') : '-'}</TableCell>
-                        <TableCell>{appointment.treatment_type || '-'}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                            {getStatusLabel(appointment.status)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setSelectedId(appointment.id);
-                                setSelectedLabel(`${appointment.patient?.nome ?? 'N/A'} - ${appointment.appointment_date ? format(new Date(appointment.appointment_date), 'dd/MM/yyyy HH:mm') : '-'}`);
-                                setReason('');
-                                setOpenDelete(true);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredAppointments.map((appointment) => {
+                      const patientName = getPatientName(appointment.pacienteId);
+                      const dentistName = getDentistName(appointment.dentistaId);
+                      const appointmentDate = appointment.dataHoraInicio ? new Date(appointment.dataHoraInicio) : null;
+                      
+                      return (
+                        <TableRow key={appointment.id} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">{patientName}</TableCell>
+                          <TableCell>{dentistName}</TableCell>
+                          <TableCell>{appointmentDate ? format(appointmentDate, 'dd/MM/yyyy') : '-'}</TableCell>
+                          <TableCell>{appointmentDate ? format(appointmentDate, 'HH:mm') : '-'}</TableCell>
+                          <TableCell>{appointment.tipoTratamento || '-'}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status || 'scheduled')}`}>
+                              {getStatusLabel(appointment.status || 'scheduled')}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setSelectedId(appointment.id);
+                                  setSelectedLabel(`${patientName} - ${appointmentDate ? format(appointmentDate, 'dd/MM/yyyy HH:mm') : '-'}`);
+                                  setReason('');
+                                  setOpenDelete(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

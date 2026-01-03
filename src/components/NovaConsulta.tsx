@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { appointmentService } from "@/services/appointmentService";
 import { patientService } from "@/services/patientService";
 import { dentistService } from "@/services/dentistService";
-import { AppointmentCreate } from "@/types/api";
+
 
 type Props = {
   children?: React.ReactNode;
@@ -34,6 +34,7 @@ type Props = {
 const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [patients, setPatients] = useState<Array<{ id: string; name: string }>>([]);
   const [dentists, setDentists] = useState<Array<{ id: string; name: string }>>([]);
   
@@ -48,26 +49,47 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
 
   useEffect(() => {
     if (open) {
-      loadPatients();
-      loadDentists();
+      setIsLoadingData(true);
+      Promise.all([loadPatients(), loadDentists()])
+        .finally(() => setIsLoadingData(false));
     }
   }, [open]);
 
   async function loadPatients() {
     try {
       const response = await patientService.list({ limit: 100 });
-      setPatients(response.items.map(p => ({ id: p.id, name: p.nome })));
-    } catch (error) {
+      
+      // A API pode retornar array direto ou objeto com items
+      const patientsList = Array.isArray(response) ? response : (response.items || []);
+      
+      if (patientsList.length > 0) {
+        setPatients(patientsList.map(p => ({ id: p.id, name: p.nome })));
+      } else {
+        setPatients([]);
+      }
+    } catch (error: any) {
       console.error("Erro ao carregar pacientes:", error);
+      toast.error("Erro ao carregar lista de pacientes");
+      setPatients([]);
     }
   }
 
   async function loadDentists() {
     try {
       const response = await dentistService.list({ limit: 100 });
-      setDentists(response.items.map(d => ({ id: d.id, name: d.nome })));
-    } catch (error) {
+      
+      // A API pode retornar array direto ou objeto com items
+      const dentistsList = Array.isArray(response) ? response : (response.items || []);
+      
+      if (dentistsList.length > 0) {
+        setDentists(dentistsList.map(d => ({ id: d.id, name: d.nome })));
+      } else {
+        setDentists([]);
+      }
+    } catch (error: any) {
       console.error("Erro ao carregar dentistas:", error);
+      toast.error("Erro ao carregar lista de dentistas");
+      setDentists([]);
     }
   }
 
@@ -92,9 +114,22 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
 
     setIsLoading(true);
     try {
-      const data: AppointmentCreate = {
-        ...formData,
-        appointment_date: new Date(formData.appointment_date).toISOString(),
+      // Converte datetime-local para ISO string
+      const dataHoraInicio = new Date(formData.appointment_date).toISOString();
+      
+      // Calcula dataHoraFim baseado na duração
+      const dataHoraFim = new Date(
+        new Date(formData.appointment_date).getTime() + formData.duration_minutes * 60000
+      ).toISOString();
+      
+      // API espera campos em português
+      const data = {
+        pacienteId: parseInt(formData.patient_id),
+        dentistaId: parseInt(formData.dentist_id),
+        dataHoraInicio,
+        dataHoraFim,
+        tipoTratamento: formData.treatment_type || undefined,
+        observacoes: formData.notes || undefined,
       };
       
       await appointmentService.create(data);
@@ -104,7 +139,8 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
       onSuccess?.();
     } catch (error: any) {
       console.error("Erro ao criar consulta:", error);
-      toast.error(error.response?.data?.detail || "Erro ao agendar consulta");
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || "Erro ao agendar consulta";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -126,16 +162,23 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
             <Select 
               value={formData.patient_id} 
               onValueChange={(val) => setFormData({ ...formData, patient_id: val })}
+              disabled={isLoadingData}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o paciente" />
+                <SelectValue placeholder={isLoadingData ? "Carregando..." : "Selecione o paciente"} />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.name}
+                {patients.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    Nenhum paciente cadastrado
                   </SelectItem>
-                ))}
+                ) : (
+                  patients.map((patient) => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -145,16 +188,23 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
             <Select 
               value={formData.dentist_id} 
               onValueChange={(val) => setFormData({ ...formData, dentist_id: val })}
+              disabled={isLoadingData}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o dentista" />
+                <SelectValue placeholder={isLoadingData ? "Carregando..." : "Selecione o dentista"} />
               </SelectTrigger>
               <SelectContent>
-                {dentists.map((dentist) => (
-                  <SelectItem key={dentist.id} value={dentist.id}>
-                    {dentist.name}
+                {dentists.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    Nenhum dentista cadastrado
                   </SelectItem>
-                ))}
+                ) : (
+                  dentists.map((dentist) => (
+                    <SelectItem key={dentist.id} value={dentist.id}>
+                      {dentist.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
