@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { appointmentService } from "@/services/appointmentService";
 import { patientService } from "@/services/patientService";
 import { dentistService } from "@/services/dentistService";
+import { appointmentSchema } from "@/schemas/forms";
+import { z } from "zod";
 
 
 type Props = {
@@ -35,6 +37,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Array<{ id: string; name: string }>>([]);
   const [dentists, setDentists] = useState<Array<{ id: string; name: string }>>([]);
   
@@ -102,14 +105,27 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
       treatment_type: "",
       notes: "",
     });
+    setErrors({});
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrors({});
 
-    if (!formData.patient_id || !formData.dentist_id || !formData.appointment_date) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
+    try {
+      appointmentSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        toast.error("Corrija os erros no formulário");
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -181,6 +197,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 )}
               </SelectContent>
             </Select>
+            {errors.patient_id && <p className="text-xs text-red-500 mt-1">{errors.patient_id}</p>}
           </div>
 
           <div>
@@ -207,6 +224,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 )}
               </SelectContent>
             </Select>
+            {errors.dentist_id && <p className="text-xs text-red-500 mt-1">{errors.dentist_id}</p>}
           </div>
 
           <div>
@@ -218,6 +236,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
               onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })} 
               required
             />
+            {errors.appointment_date && <p className="text-xs text-red-500 mt-1">{errors.appointment_date}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -231,6 +250,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 value={formData.duration_minutes} 
                 onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })} 
               />
+              {errors.duration_minutes && <p className="text-xs text-red-500 mt-1">{errors.duration_minutes}</p>}
             </div>
 
             <div>
@@ -241,6 +261,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, treatment_type: e.target.value })}
                 placeholder="Ex: Limpeza, Consulta, Extração"
               />
+              {errors.treatment_type && <p className="text-xs text-red-500 mt-1">{errors.treatment_type}</p>}
             </div>
           </div>
 
@@ -253,6 +274,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
               placeholder="Observações adicionais..."
               rows={3}
             />
+            {errors.notes && <p className="text-xs text-red-500 mt-1">{errors.notes}</p>}
           </div>
 
           <DialogFooter>

@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { isEmailValid } from '@/lib/utils';
 import { patientService } from "@/services/patientService";
 import { PatientCreate } from "@/types/api";
+import { patientSchema } from "@/schemas/forms";
+import { z } from "zod";
 
 type Props = {
   children?: React.ReactNode;
@@ -29,6 +31,7 @@ type Props = {
 const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<PatientCreate>({
     nome: "",
     telefone: "",
@@ -40,8 +43,6 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
 
   const { plans } = usePlans();
 
-  
-
   function reset() {
     setFormData({
       nome: "",
@@ -51,14 +52,28 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
       dataNascimento: "",
       observacoes: "",
     });
+    setErrors({});
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrors({});
 
-    if (!formData.nome || !formData.telefone) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
+    try {
+      // Valida com Zod
+      patientSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        toast.error("Corrija os erros no formulário");
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -99,6 +114,7 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
               placeholder="Nome completo do paciente"
               required
             />
+            {errors.nome && <p className="text-xs text-red-500 mt-1">{errors.nome}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -114,6 +130,7 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
                 placeholder="(00) 00000-0000"
                 required
               />
+              {errors.telefone && <p className="text-xs text-red-500 mt-1">{errors.telefone}</p>}
             </div>
 
             <div>
@@ -125,9 +142,7 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="email@exemplo.com"
               />
-              {formData.email && !isEmailValid(formData.email) && (
-                <p className="text-xs text-amber-600 mt-1">Informe um endereço de email válido (ex.: usuário@dominio).</p>
-              )}
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
             </div>
           </div>
 
@@ -168,6 +183,7 @@ const NovoPaciente: React.FC<Props> = ({ children, onSuccess }) => {
               placeholder="Observações sobre o paciente..."
               rows={3}
             />
+            {errors.observacoes && <p className="text-xs text-red-500 mt-1">{errors.observacoes}</p>}
           </div>
 
           <DialogFooter>
