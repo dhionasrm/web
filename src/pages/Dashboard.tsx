@@ -40,19 +40,19 @@ const Dashboard = () => {
       title: 'Consultas Hoje',
       value: String(stats.appointments_today),
       icon: CalendarDays,
-      trend: `${stats.appointments_week} esta semana`,
+      trend: `${stats.appointments_this_week} esta semana`,
       color: 'bg-primary/10 text-primary',
     },
     {
       title: 'Pacientes Ativos',
       value: String(stats.total_patients),
       icon: Users,
-      trend: `${stats.active_patients} ativos`,
+      trend: `${stats.total_patients} total`,
       color: 'bg-success/10 text-success',
     },
     {
       title: 'Consultas Mês',
-      value: String(stats.appointments_month),
+      value: String(stats.appointments_this_month),
       icon: Clock,
       trend: 'Neste mês',
       color: 'bg-warning/10 text-warning',
@@ -150,7 +150,7 @@ const Dashboard = () => {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-medium text-primary">
-                          {appointment.patient_name.charAt(0)}
+                          {appointment.patient_name ? appointment.patient_name.charAt(0).toUpperCase() : 'P'}
                         </span>
                       </div>
                       <div>
@@ -160,7 +160,10 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-foreground">
-                        {format(new Date(appointment.appointment_date), 'HH:mm', { locale: ptBR })}
+                        {appointment.appointment_date 
+                          ? format(new Date(appointment.appointment_date), 'HH:mm', { locale: ptBR })
+                          : '--:--'
+                        }
                       </p>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(appointment.status)}`}>
                         {getStatusLabel(appointment.status)}

@@ -141,7 +141,7 @@ const Doutores = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                       <span className="text-lg font-semibold text-primary">
-                        {doctor.nome.charAt(0)}
+                        {doctor.nome ? doctor.nome.charAt(0).toUpperCase() : 'D'}
                       </span>
                     </div>
                     <div>

@@ -143,7 +143,7 @@ const Pacientes = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                       <span className="text-lg font-semibold text-primary">
-                        {patient.nome.charAt(0)}
+                        {patient.nome ? patient.nome.charAt(0).toUpperCase() : 'P'}
                       </span>
                     </div>
                     <div>

@@ -20,10 +20,13 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { appointmentService } from "@/services/appointmentService";
 import { patientService } from "@/services/patientService";
 import { dentistService } from "@/services/dentistService";
+import { notificationService } from "@/services/notificationService";
 import { appointmentSchema } from "@/schemas/forms";
 import { z } from "zod";
 
@@ -48,6 +51,12 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
     duration_minutes: 60,
     treatment_type: "",
     notes: "",
+  });
+
+  const [sendNotifications, setSendNotifications] = useState({
+    whatsapp: false,
+    sms: false,
+    email: false,
   });
 
   useEffect(() => {
@@ -105,6 +114,11 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
       treatment_type: "",
       notes: "",
     });
+    setSendNotifications({
+      whatsapp: false,
+      sms: false,
+      email: false,
+    });
     setErrors({});
   }
 
@@ -149,6 +163,36 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
       };
       
       await appointmentService.create(data);
+      
+      // Enviar notificações se selecionadas
+      if (sendNotifications.whatsapp || sendNotifications.sms || sendNotifications.email) {
+        try {
+          const promises = [];
+          if (sendNotifications.whatsapp) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(), // Ajustar quando API retornar ID
+              channel: 'whatsapp'
+            }));
+          }
+          if (sendNotifications.sms) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(),
+              channel: 'sms'
+            }));
+          }
+          if (sendNotifications.email) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(),
+              channel: 'email'
+            }));
+          }
+          await Promise.all(promises);
+        } catch (notifError) {
+          console.error("Erro ao enviar notificações:", notifError);
+          // Não falhar o agendamento por erro nas notificações
+        }
+      }
+      
       toast.success("Consulta agendada com sucesso!");
       setOpen(false);
       reset();
@@ -275,6 +319,53 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
               rows={3}
             />
             {errors.notes && <p className="text-xs text-red-500 mt-1">{errors.notes}</p>}
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="space-y-3">
+            <Label className="text-base">Enviar notificações</Label>
+            <p className="text-sm text-muted-foreground">
+              Notificar o paciente sobre o agendamento
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-whatsapp"
+                  checked={sendNotifications.whatsapp}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, whatsapp: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-whatsapp" className="text-sm font-normal cursor-pointer">
+                  Enviar via WhatsApp
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-sms"
+                  checked={sendNotifications.sms}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, sms: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-sms" className="text-sm font-normal cursor-pointer">
+                  Enviar via SMS
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-email"
+                  checked={sendNotifications.email}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, email: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-email" className="text-sm font-normal cursor-pointer">
+                  Enviar via E-mail
+                </Label>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
