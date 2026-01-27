@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -27,8 +28,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b border-border flex items-center px-4 bg-card/50 backdrop-blur-sm">
+          <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/50 backdrop-blur-sm">
             <SidebarTrigger className="mr-4" />
+            <NotificationCenter />
           </header>
           <div className="flex-1 p-6 overflow-auto">
             {children}

@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { isEmailValid } from '@/lib/utils';
 import { dentistService } from "@/services/dentistService";
 import { DentistCreate } from "@/types/api";
+import { dentistSchema } from "@/schemas/forms";
+import { z } from "zod";
 
 type Props = {
   children?: React.ReactNode;
@@ -26,6 +28,7 @@ type Props = {
 const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<DentistCreate>({
     nome: "",
     cro: "",
@@ -42,14 +45,27 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
       telefone: "",
       email: "",
     });
+    setErrors({});
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrors({});
 
-    if (!formData.nome || !formData.cro || !formData.telefone) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
+    try {
+      dentistSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        toast.error("Corrija os erros no formulário");
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -91,6 +107,7 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
                 placeholder="Nome completo do dentista"
                 required
               />
+              {errors.nome && <p className="text-xs text-red-500 mt-1">{errors.nome}</p>}
             </div>
 
             <div>
@@ -102,6 +119,7 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
                 placeholder="Número do CRO"
                 required
               />
+              {errors.cro && <p className="text-xs text-red-500 mt-1">{errors.cro}</p>}
             </div>
           </div>
 
@@ -113,6 +131,7 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
               onChange={(e) => setFormData({ ...formData, especialidade: e.target.value })}
               placeholder="Ex: Ortodontia, Implantodontia, etc"
             />
+            {errors.especialidade && <p className="text-xs text-red-500 mt-1">{errors.especialidade}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -125,6 +144,7 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
                 placeholder="(00) 00000-0000"
                 required
               />
+              {errors.telefone && <p className="text-xs text-red-500 mt-1">{errors.telefone}</p>}
             </div>
 
             <div>
@@ -136,9 +156,7 @@ const NovoDentista: React.FC<Props> = ({ children, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="email@exemplo.com"
               />
-              {formData.email && !isEmailValid(formData.email) && (
-                <p className="text-xs text-amber-600 mt-1">Informe um endereço de email válido (ex.: usuário@dominio).</p>
-              )}
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
             </div>
           </div>
 

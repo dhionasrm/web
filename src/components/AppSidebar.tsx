@@ -1,4 +1,4 @@
-import { Calendar, LayoutDashboard, Users, CalendarDays, Settings, LogOut, LifeBuoy } from 'lucide-react';
+import { Calendar, LayoutDashboard, Users, CalendarDays, Settings, LogOut, LifeBuoy, Bell } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +21,7 @@ const menuItems = [
   { title: 'Calendário', url: '/calendario', icon: Calendar },
   { title: 'Dentistas', url: '/doutores', icon: Users },
   { title: 'Pacientes', url: '/pacientes', icon: Users },
+  { title: 'Notificações', url: '/notificacoes', icon: Bell },
   { title: 'Suporte', url: '/suporte', icon: LifeBuoy },
 ];
 
@@ -68,11 +69,11 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-medium text-primary">
-              {user?.nome?.charAt(0).toUpperCase()}
+              {user?.nome ? user.nome.charAt(0).toUpperCase() : 'U'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{user?.nome}</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.nome || 'Usuário'}</p>
             <p className="text-xs text-muted-foreground">{user?.perfil ?? 'Administrador'}</p>
           </div>
         </div>

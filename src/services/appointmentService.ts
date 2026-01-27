@@ -8,7 +8,7 @@ import {
 } from '../types/api';
 
 export const appointmentService = {
-  async create(data: AppointmentCreate): Promise<Appointment> {
+  async create(data: any): Promise<Appointment> {
     const response = await api.post<Appointment>('/api/appointments/', data);
     return response.data;
   },

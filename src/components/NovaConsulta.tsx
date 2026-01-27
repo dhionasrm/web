@@ -20,11 +20,16 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { appointmentService } from "@/services/appointmentService";
 import { patientService } from "@/services/patientService";
 import { dentistService } from "@/services/dentistService";
-import { AppointmentCreate } from "@/types/api";
+import { notificationService } from "@/services/notificationService";
+import { appointmentSchema } from "@/schemas/forms";
+import { z } from "zod";
+
 
 type Props = {
   children?: React.ReactNode;
@@ -34,6 +39,8 @@ type Props = {
 const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [patients, setPatients] = useState<Array<{ id: string; name: string }>>([]);
   const [dentists, setDentists] = useState<Array<{ id: string; name: string }>>([]);
   
@@ -46,28 +53,55 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
     notes: "",
   });
 
+  const [sendNotifications, setSendNotifications] = useState({
+    whatsapp: false,
+    sms: false,
+    email: false,
+  });
+
   useEffect(() => {
     if (open) {
-      loadPatients();
-      loadDentists();
+      setIsLoadingData(true);
+      Promise.all([loadPatients(), loadDentists()])
+        .finally(() => setIsLoadingData(false));
     }
   }, [open]);
 
   async function loadPatients() {
     try {
       const response = await patientService.list({ limit: 100 });
-      setPatients(response.items.map(p => ({ id: p.id, name: p.nome })));
-    } catch (error) {
+      
+      // A API pode retornar array direto ou objeto com items
+      const patientsList = Array.isArray(response) ? response : (response.items || []);
+      
+      if (patientsList.length > 0) {
+        setPatients(patientsList.map(p => ({ id: p.id, name: p.nome })));
+      } else {
+        setPatients([]);
+      }
+    } catch (error: any) {
       console.error("Erro ao carregar pacientes:", error);
+      toast.error("Erro ao carregar lista de pacientes");
+      setPatients([]);
     }
   }
 
   async function loadDentists() {
     try {
       const response = await dentistService.list({ limit: 100 });
-      setDentists(response.items.map(d => ({ id: d.id, name: d.nome })));
-    } catch (error) {
+      
+      // A API pode retornar array direto ou objeto com items
+      const dentistsList = Array.isArray(response) ? response : (response.items || []);
+      
+      if (dentistsList.length > 0) {
+        setDentists(dentistsList.map(d => ({ id: d.id, name: d.nome })));
+      } else {
+        setDentists([]);
+      }
+    } catch (error: any) {
       console.error("Erro ao carregar dentistas:", error);
+      toast.error("Erro ao carregar lista de dentistas");
+      setDentists([]);
     }
   }
 
@@ -80,31 +114,93 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
       treatment_type: "",
       notes: "",
     });
+    setSendNotifications({
+      whatsapp: false,
+      sms: false,
+      email: false,
+    });
+    setErrors({});
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrors({});
 
-    if (!formData.patient_id || !formData.dentist_id || !formData.appointment_date) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
+    try {
+      appointmentSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        toast.error("Corrija os erros no formulário");
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      const data: AppointmentCreate = {
-        ...formData,
-        appointment_date: new Date(formData.appointment_date).toISOString(),
+      // Converte datetime-local para ISO string
+      const dataHoraInicio = new Date(formData.appointment_date).toISOString();
+      
+      // Calcula dataHoraFim baseado na duração
+      const dataHoraFim = new Date(
+        new Date(formData.appointment_date).getTime() + formData.duration_minutes * 60000
+      ).toISOString();
+      
+      // API espera campos em português
+      const data = {
+        pacienteId: parseInt(formData.patient_id),
+        dentistaId: parseInt(formData.dentist_id),
+        dataHoraInicio,
+        dataHoraFim,
+        tipoTratamento: formData.treatment_type || undefined,
+        observacoes: formData.notes || undefined,
       };
       
       await appointmentService.create(data);
+      
+      // Enviar notificações se selecionadas
+      if (sendNotifications.whatsapp || sendNotifications.sms || sendNotifications.email) {
+        try {
+          const promises = [];
+          if (sendNotifications.whatsapp) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(), // Ajustar quando API retornar ID
+              channel: 'whatsapp'
+            }));
+          }
+          if (sendNotifications.sms) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(),
+              channel: 'sms'
+            }));
+          }
+          if (sendNotifications.email) {
+            promises.push(notificationService.sendNotification({
+              appointment_id: data.pacienteId.toString(),
+              channel: 'email'
+            }));
+          }
+          await Promise.all(promises);
+        } catch (notifError) {
+          console.error("Erro ao enviar notificações:", notifError);
+          // Não falhar o agendamento por erro nas notificações
+        }
+      }
+      
       toast.success("Consulta agendada com sucesso!");
       setOpen(false);
       reset();
       onSuccess?.();
     } catch (error: any) {
       console.error("Erro ao criar consulta:", error);
-      toast.error(error.response?.data?.detail || "Erro ao agendar consulta");
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || "Erro ao agendar consulta";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -126,18 +222,26 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
             <Select 
               value={formData.patient_id} 
               onValueChange={(val) => setFormData({ ...formData, patient_id: val })}
+              disabled={isLoadingData}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o paciente" />
+                <SelectValue placeholder={isLoadingData ? "Carregando..." : "Selecione o paciente"} />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.name}
+                {patients.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    Nenhum paciente cadastrado
                   </SelectItem>
-                ))}
+                ) : (
+                  patients.map((patient) => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            {errors.patient_id && <p className="text-xs text-red-500 mt-1">{errors.patient_id}</p>}
           </div>
 
           <div>
@@ -145,18 +249,26 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
             <Select 
               value={formData.dentist_id} 
               onValueChange={(val) => setFormData({ ...formData, dentist_id: val })}
+              disabled={isLoadingData}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o dentista" />
+                <SelectValue placeholder={isLoadingData ? "Carregando..." : "Selecione o dentista"} />
               </SelectTrigger>
               <SelectContent>
-                {dentists.map((dentist) => (
-                  <SelectItem key={dentist.id} value={dentist.id}>
-                    {dentist.name}
+                {dentists.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    Nenhum dentista cadastrado
                   </SelectItem>
-                ))}
+                ) : (
+                  dentists.map((dentist) => (
+                    <SelectItem key={dentist.id} value={dentist.id}>
+                      {dentist.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            {errors.dentist_id && <p className="text-xs text-red-500 mt-1">{errors.dentist_id}</p>}
           </div>
 
           <div>
@@ -168,6 +280,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
               onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })} 
               required
             />
+            {errors.appointment_date && <p className="text-xs text-red-500 mt-1">{errors.appointment_date}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -181,6 +294,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 value={formData.duration_minutes} 
                 onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })} 
               />
+              {errors.duration_minutes && <p className="text-xs text-red-500 mt-1">{errors.duration_minutes}</p>}
             </div>
 
             <div>
@@ -191,6 +305,7 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, treatment_type: e.target.value })}
                 placeholder="Ex: Limpeza, Consulta, Extração"
               />
+              {errors.treatment_type && <p className="text-xs text-red-500 mt-1">{errors.treatment_type}</p>}
             </div>
           </div>
 
@@ -203,6 +318,54 @@ const NovaConsulta: React.FC<Props> = ({ children, onSuccess }) => {
               placeholder="Observações adicionais..."
               rows={3}
             />
+            {errors.notes && <p className="text-xs text-red-500 mt-1">{errors.notes}</p>}
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="space-y-3">
+            <Label className="text-base">Enviar notificações</Label>
+            <p className="text-sm text-muted-foreground">
+              Notificar o paciente sobre o agendamento
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-whatsapp"
+                  checked={sendNotifications.whatsapp}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, whatsapp: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-whatsapp" className="text-sm font-normal cursor-pointer">
+                  Enviar via WhatsApp
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-sms"
+                  checked={sendNotifications.sms}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, sms: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-sms" className="text-sm font-normal cursor-pointer">
+                  Enviar via SMS
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="notify-email"
+                  checked={sendNotifications.email}
+                  onCheckedChange={(checked) => 
+                    setSendNotifications(prev => ({ ...prev, email: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="notify-email" className="text-sm font-normal cursor-pointer">
+                  Enviar via E-mail
+                </Label>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
